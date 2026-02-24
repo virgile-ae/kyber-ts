@@ -1,15 +1,12 @@
 import { Utilities } from "./utilities";
 import { Buffer } from "buffer";
 import { SHAKE } from "sha3";
-import { ByteOps } from "./byte-ops";
+import { barrettReduce, montgomeryReduce, generateCBDPoly, modQMulMont } from "./byte-ops";
 import { KyberService } from "../services/kyber.service";
 
 export class Poly {
-    public byteOps: ByteOps;
 
-    constructor(public paramsK: number) {
-        this.byteOps = new ByteOps(this.paramsK);
-    }
+    constructor(public paramsK: number) { }
 
     /**
      * Applies the inverse number-theoretic transform (NTT) to all elements of a
@@ -184,7 +181,7 @@ export class Poly {
             l = KyberService.paramsETAK768K1024 * KyberService.paramsN / 4;
         }
         let p = this.generatePRFByteArray(l, seed, nonce);
-        return this.byteOps.generateCBDPoly(p, paramsK);
+        return generateCBDPoly(p, paramsK);
     }
 
     /**
@@ -233,7 +230,7 @@ export class Poly {
                 zeta = KyberService.nttZetas[k];
                 k++;
                 for (j = start; j < start + l; j++) {
-                    t = this.byteOps.modQMulMont(zeta, r[j + l]); // t is mod q
+                    t = modQMulMont(zeta, r[j + l]); // t is mod q
                     r[j + l] = Utilities.int16(r[j] - t);
                     r[j] = Utilities.int16(r[j] + t);
                 }
@@ -250,7 +247,7 @@ export class Poly {
      */
     public polyReduce(r: Array<number>) {
         for (let i = 0; i < KyberService.paramsN; i++) {
-            r[i] = this.byteOps.barrettReduce(r[i]);
+            r[i] = barrettReduce(r[i]);
         }
         return r;
     }
@@ -264,7 +261,7 @@ export class Poly {
      */
     public polyToMont(r: Array<number>) {
         for (let i = 0; i < KyberService.paramsN; i++) {
-            r[i] = this.byteOps.byteopsMontgomeryReduce(Utilities.int32(r[i]) * Utilities.int32(1353));
+            r[i] = montgomeryReduce(Utilities.int32(r[i]) * Utilities.int32(1353));
         }
         return r;
     }
@@ -328,11 +325,11 @@ export class Poly {
      */
     public nttBaseMuliplier(a0: number, a1: number, b0: number, b1: number, zeta: number) {
         let r: number[] = []; // 2
-        r[0] = this.byteOps.modQMulMont(a1, b1);
-        r[0] = this.byteOps.modQMulMont(r[0], zeta);
-        r[0] = r[0] + this.byteOps.modQMulMont(a0, b0);
-        r[1] = this.byteOps.modQMulMont(a0, b1);
-        r[1] = r[1] + this.byteOps.modQMulMont(a1, b0);
+        r[0] = modQMulMont(a1, b1);
+        r[0] = modQMulMont(r[0], zeta);
+        r[0] = r[0] + modQMulMont(a0, b0);
+        r[1] = modQMulMont(a0, b1);
+        r[1] = r[1] + modQMulMont(a1, b0);
         return r;
     }
 
@@ -404,14 +401,14 @@ export class Poly {
                 k = k + 1;
                 for (j = start; j < start + l; j++) {
                     t = r[j];
-                    r[j] = this.byteOps.barrettReduce(t + r[j + l]);
+                    r[j] = barrettReduce(t + r[j + l]);
                     r[j + l] = t - r[j + l];
-                    r[j + l] = this.byteOps.modQMulMont(zeta, r[j + l]);
+                    r[j + l] = modQMulMont(zeta, r[j + l]);
                 }
             }
         }
         for (j = 0; j < 256; j++) {
-            r[j] = this.byteOps.modQMulMont(r[j], KyberService.nttZetasInv[127]);
+            r[j] = modQMulMont(r[j], KyberService.nttZetasInv[127]);
         }
         return r;
     }
